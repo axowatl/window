@@ -1,18 +1,178 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title></title>
-  <meta name="author" content="">
-  <meta name="description" content="">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniStats Test</title>
+    <style>
+        body {
+            /* Create a visible area for the stats to overlay */
+            height: 100vh;
+            width: 100vw;
+            margin: 0;
+            background-color: #333;
+            color: white;
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+        }
 
-  <link href="css/style.css" rel="stylesheet">
+        #stats {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            color: #fff;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 8px;
+            border-radius: 5px;
+            z-index: 9999;
+        }
+
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .value {
+            color: #8aff8a;
+        }
+
+        canvas {
+            display: block;
+            border: 2px solid #888;
+            margin-top: 20px;
+        }
+    </style>
 </head>
-
 <body>
-  <script src="js/script.js"></script>
-</body>
 
+    <h1>MiniStats Website Test</h1>
+    <p>This page simulates some CPU and GPU work to test the MiniStats overlay.</p>
+    <p>The GPU metric will only show up if a WebGL2 context is active on the page.</p>
+
+    <canvas id="gl-canvas" width="600" height="400"></canvas>
+
+    <div id="stats">
+        <div class="stat">
+            <div class="label">FPS</div>
+            <div id="fps" class="value">0</div>
+        </div>
+        <div class="stat">
+            <div class="label">CPU</div>
+            <div id="cpu" class="value">0 ms</div>
+        </div>
+        <div class="stat">
+            <div class="label">GPU</div>
+            <div id="gpu" class="value">0 ms</div>
+        </div>
+    </div>
+
+    <script>
+        class MiniStats {
+            constructor() {
+                this.fpsElement = document.getElementById('fps');
+                this.cpuElement = document.getElementById('cpu');
+                this.gpuElement = document.getElementById('gpu');
+
+                this.lastFrameTime = performance.now();
+                this.frameTimes = [];
+                this.cpuTime = 0;
+                this.gpuTime = 0;
+
+                this.gl = null;
+                this.gpuTimer = null;
+                this.isGpuTimerSupported = false;
+                this.canvas = document.getElementById('gl-canvas');
+
+                this.setupGpuTimer();
+
+                this.loop = this.loop.bind(this);
+                requestAnimationFrame(this.loop);
+            }
+
+            setupGpuTimer() {
+                try {
+                    this.gl = this.canvas.getContext('webgl2', { antialias: false });
+                    if (this.gl) {
+                        this.isGpuTimerSupported = this.gl.getExtension('EXT_disjoint_timer_query_webgl2');
+                        if (this.isGpuTimerSupported) {
+                            console.log('WebGL2 EXT_disjoint_timer_query_webgl2 is supported.');
+                            this.gpuTimer = this.gl.createQuery();
+                        } else {
+                            console.warn('WebGL2 timer queries not supported. GPU time will not be displayed.');
+                        }
+                    } else {
+                        console.warn('WebGL2 not supported. GPU time will not be displayed.');
+                    }
+                } catch (e) {
+                    console.error('Failed to get WebGL2 context:', e);
+                }
+            }
+
+            loop(timestamp) {
+                const frameStartTime = performance.now();
+
+                // 1. **Measure FPS**
+                this.frameTimes.push(timestamp);
+                while (this.frameTimes.length > 60) {
+                    this.frameTimes.shift();
+                }
+                const duration = this.frameTimes[this.frameTimes.length - 1] - this.frameTimes[0];
+                const fps = Math.round(this.frameTimes.length / (duration / 1000));
+                this.fpsElement.textContent = fps;
+
+                // 2. **Start GPU Timer**
+                if (this.isGpuTimerSupported) {
+                    // Check if previous query results are available
+                    const queryResultAvailable = this.gl.getQueryParameter(this.gpuTimer, this.gl.QUERY_RESULT_AVAILABLE);
+                    if (queryResultAvailable) {
+                        const nanoseconds = this.gl.getQueryParameter(this.gpuTimer, this.gl.QUERY_RESULT);
+                        this.gpuTime = nanoseconds / 1000000;
+                        this.gpuElement.textContent = this.gpuTime.toFixed(2) + ' ms';
+                    }
+                    this.gl.beginQuery(this.gl.TIME_ELAPSED_EXT, this.gpuTimer);
+                }
+
+                // --- SIMULATE CPU & GPU WORK ---
+                // Simulate some CPU work
+                const busyWorkCount = 50000;
+                for (let i = 0; i < busyWorkCount; i++) {
+                    Math.sqrt(Math.random());
+                }
+
+                // Simulate some GPU work (e.g., a WebGL draw call)
+                if (this.gl) {
+                    this.gl.clearColor(0.2, 0.2, 0.2, 1.0);
+                    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+                }
+
+                // 3. **End GPU Timer**
+                if (this.isGpuTimerSupported) {
+                    this.gl.endQuery(this.gl.TIME_ELAPSED_EXT);
+                }
+
+                // 4. **Measure CPU Time**
+                this.cpuTime = performance.now() - frameStartTime;
+                this.cpuElement.textContent = this.cpuTime.toFixed(2) + ' ms';
+
+                requestAnimationFrame(this.loop);
+            }
+        }
+
+        // Start the stats monitor
+        window.addEventListener('load', () => new MiniStats());
+    </script>
+
+</body>
 </html>
