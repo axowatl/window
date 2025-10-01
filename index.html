@@ -12,8 +12,48 @@
 </head>
 
 <body>
-  <script src="https://cdn.jsdelivr.net/npm/jsframe.js/lib/jsframe.min.js"></script>
-  <script type="module" src="js/script.js"></script>
+  <script>
+    // Function to create and append the overlay to the document
+function createOverlay() {
+  const overlay = document.createElement('div');
+  overlay.id = 'performance-overlay';
+  overlay.textContent = 'FPS: --';
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+// Function to calculate and update the FPS
+function startFpsCounter(overlay) {
+  let frameCount = 0;
+  let lastTime = performance.now();
+  let fps = 0;
+
+  function update() {
+    const currentTime = performance.now();
+    frameCount++;
+
+    if (currentTime > lastTime + 1000) {
+      // Calculate FPS
+      fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
+      // Update the overlay text
+      overlay.textContent = `FPS: ${fps}`;
+      // Reset for the next second
+      frameCount = 0;
+      lastTime = currentTime;
+    }
+
+    // Schedule the next update
+    requestAnimationFrame(update);
+  }
+
+  // Start the animation frame loop
+  requestAnimationFrame(update);
+}
+
+// Run the script
+const overlay = createOverlay();
+startFpsCounter(overlay);
+  </script>
 </body>
 
 </html>
